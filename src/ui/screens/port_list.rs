@@ -90,15 +90,26 @@ pub fn render_port_list(
     f.render_widget(search_text, chunks[0]);
 
     // Table
-    let header_cells = ["Port", "Protocol", "State", "PID", "Process Name"]
+    let header_cells = ["Local Address", "Protocol", "State", "PID", "Process Name"]
         .iter()
         .map(|h| Cell::from(*h).style(Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD)));
     let header = Row::new(header_cells).style(Style::default().bg(Color::DarkGray)).height(1).bottom_margin(0);
 
     let rows = ports.iter().map(|p| {
-        let port_str = p.local_port.to_string();
-        let protocol = format!("{:?}", p.protocol);
+        let address_str = format!("{}:{}", p.local_ip, p.local_port);
+        
+        let protocol_cell = match p.protocol {
+            crate::domain::ports::models::Protocol::Tcp => Cell::from("TCP").style(Style::default().fg(Color::Cyan)),
+            crate::domain::ports::models::Protocol::Udp => Cell::from("UDP").style(Style::default().fg(Color::Magenta)),
+        };
+
         let state_str = p.state.clone();
+        let state_cell = match state_str.as_str() {
+            "LISTEN" => Cell::from(state_str).style(Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            "ESTABLISHED" => Cell::from(state_str).style(Style::default().fg(Color::Yellow)),
+            "TIME_WAIT" | "CLOSE_WAIT" => Cell::from(state_str).style(Style::default().fg(Color::DarkGray)),
+            _ => Cell::from(state_str),
+        };
         
         let pid_str = p.pids.iter().map(|pid| pid.to_string()).collect::<Vec<_>>().join(", ");
         
@@ -111,18 +122,24 @@ pub fn render_port_list(
             }
         }).collect::<Vec<_>>().join(", ");
 
-        Row::new(vec![port_str, protocol, state_str, pid_str, process_names])
+        Row::new(vec![
+            Cell::from(address_str),
+            protocol_cell,
+            state_cell,
+            Cell::from(pid_str),
+            Cell::from(process_names)
+        ])
     });
 
     let table = Table::new(rows, [
-        Constraint::Length(10), // Port
+        Constraint::Length(25), // Address
         Constraint::Length(10), // Protocol
         Constraint::Length(15), // State
         Constraint::Length(15), // PID
         Constraint::Min(20),    // Process Name
     ])
     .header(header)
-    .block(Block::default().borders(Borders::ALL).title(" Listening Ports (Press 'Esc' to go to Processes) "))
+    .block(Block::default().borders(Borders::ALL).title(" Listening Ports (Actions: [Enter] Inspect Process | [K] Kill Process | [Esc] Back) "))
     .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED))
     .highlight_symbol(">> ");
 
