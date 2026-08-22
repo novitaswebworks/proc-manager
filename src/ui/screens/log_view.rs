@@ -12,6 +12,8 @@ pub struct LogViewState {
     pub auto_scroll: bool,
     pub service_name: Option<String>,
     pub container_id: Option<String>,
+    pub is_searching: bool,
+    pub search_query: String,
 }
 
 impl LogViewState {
@@ -23,6 +25,8 @@ impl LogViewState {
             auto_scroll: true,
             service_name: None,
             container_id: None,
+            is_searching: false,
+            search_query: String::new(),
         }
     }
 
@@ -48,13 +52,42 @@ impl LogViewState {
 }
 
 pub fn render_log_view(f: &mut Frame, area: Rect, state: &mut LogViewState) {
+    let chunks = ratatui::layout::Layout::default()
+        .direction(ratatui::layout::Direction::Vertical)
+        .constraints([
+            ratatui::layout::Constraint::Length(3), // Search bar
+            ratatui::layout::Constraint::Min(0),    // Logs
+        ])
+        .split(area);
+
+    let search_title = if state.is_searching {
+        " Search Logs (Active - Press Enter to finish) "
+    } else {
+        " Search Logs (Press '/' to search) "
+    };
+    
+    let search_block = Block::default()
+        .title(search_title)
+        .borders(Borders::ALL)
+        .style(if state.is_searching { Style::default().fg(Color::Yellow) } else { Style::default() });
+    
+    let search_text = Paragraph::new(state.search_query.as_str()).block(search_block);
+    f.render_widget(search_text, chunks[0]);
+
     let block = Block::default()
         .borders(Borders::ALL)
         .title(format!(" {} Logs (L/R: Refresh, Esc: Back, Up/Down: Scroll) ", state.title));
 
-    let text: String = state.logs.join("\n");
-    let line_count = state.logs.len() as u16;
-    let height = area.height.saturating_sub(2); // borders
+    let query = state.search_query.to_lowercase();
+    let filtered_logs: Vec<String> = if query.is_empty() {
+        state.logs.clone()
+    } else {
+        state.logs.iter().filter(|l| l.to_lowercase().contains(&query)).cloned().collect()
+    };
+
+    let text: String = filtered_logs.join("\n");
+    let line_count = filtered_logs.len() as u16;
+    let height = chunks[1].height.saturating_sub(2); // borders
 
     if state.auto_scroll {
         state.scroll = line_count.saturating_sub(height);
@@ -67,7 +100,7 @@ pub fn render_log_view(f: &mut Frame, area: Rect, state: &mut LogViewState) {
         .scroll((state.scroll, 0))
         .style(Style::default().fg(Color::LightCyan));
 
-    f.render_widget(paragraph, area);
+    f.render_widget(paragraph, chunks[1]);
     
     // Render Scrollbar
     let scrollbar = Scrollbar::default()
@@ -78,10 +111,10 @@ pub fn render_log_view(f: &mut Frame, area: Rect, state: &mut LogViewState) {
     let mut scrollbar_state = ScrollbarState::new(line_count as usize).position(state.scroll as usize);
     
     let scroll_area = Rect {
-        x: area.x + area.width.saturating_sub(1),
-        y: area.y + 1,
+        x: chunks[1].x + chunks[1].width.saturating_sub(1),
+        y: chunks[1].y + 1,
         width: 1,
-        height: area.height.saturating_sub(2),
+        height: chunks[1].height.saturating_sub(2),
     };
     
     f.render_stateful_widget(scrollbar, scroll_area, &mut scrollbar_state);

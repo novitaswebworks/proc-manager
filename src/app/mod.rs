@@ -833,32 +833,50 @@ impl App {
                         }
                     }
                     ActiveScreen::LogView => {
-                        match key.code {
-                            KeyCode::Esc | KeyCode::Char('q') | KeyCode::Backspace => {
-                                self.active_screen = self.previous_screen;
+                        if self.log_view_state.is_searching {
+                            match key.code {
+                                KeyCode::Enter | KeyCode::Esc => {
+                                    self.log_view_state.is_searching = false;
+                                }
+                                KeyCode::Char(c) => {
+                                    self.log_view_state.search_query.push(c);
+                                }
+                                KeyCode::Backspace => {
+                                    self.log_view_state.search_query.pop();
+                                }
+                                _ => {}
                             }
-                            KeyCode::Up | KeyCode::Char('k') => {
-                                self.log_view_state.scroll_up();
-                            }
-                            KeyCode::Down | KeyCode::Char('j') => {
-                                let max = self.log_view_state.logs.len() as u16;
-                                self.log_view_state.scroll_down(max);
-                            }
-                            KeyCode::Char('L') | KeyCode::Char('l') | KeyCode::Char('r') => {
-                                // Refresh logs
-                                if let Some(container_id) = self.log_view_state.container_id.clone() {
-                                    if let Ok(logs) = self.docker_manager.get_container_logs(&container_id, 100).await {
-                                        self.log_view_state.set_logs(logs);
-                                        self.notify("Refreshed container logs");
-                                    }
-                                } else if let Some(service_name) = self.log_view_state.service_name.clone() {
-                                    if let Ok(logs) = self.service_manager.get_service_logs(&service_name, 100) {
-                                        self.log_view_state.set_logs(logs);
-                                        self.notify("Refreshed service logs");
+                        } else {
+                            match key.code {
+                                KeyCode::Char('/') => {
+                                    self.log_view_state.is_searching = true;
+                                }
+                                KeyCode::Esc | KeyCode::Char('q') | KeyCode::Backspace => {
+                                    self.active_screen = self.previous_screen;
+                                }
+                                KeyCode::Up | KeyCode::Char('k') => {
+                                    self.log_view_state.scroll_up();
+                                }
+                                KeyCode::Down | KeyCode::Char('j') => {
+                                    let max = self.log_view_state.logs.len() as u16;
+                                    self.log_view_state.scroll_down(max);
+                                }
+                                KeyCode::Char('L') | KeyCode::Char('l') | KeyCode::Char('r') => {
+                                    // Refresh logs
+                                    if let Some(container_id) = self.log_view_state.container_id.clone() {
+                                        if let Ok(logs) = self.docker_manager.get_container_logs(&container_id, 100).await {
+                                            self.log_view_state.set_logs(logs);
+                                            self.notify("Refreshed container logs");
+                                        }
+                                    } else if let Some(service_name) = self.log_view_state.service_name.clone() {
+                                        if let Ok(logs) = self.service_manager.get_service_logs(&service_name, 100) {
+                                            self.log_view_state.set_logs(logs);
+                                            self.notify("Refreshed service logs");
+                                        }
                                     }
                                 }
+                                _ => {}
                             }
-                            _ => {}
                         }
                     }
                 }
