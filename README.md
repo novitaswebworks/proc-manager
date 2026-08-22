@@ -12,6 +12,8 @@
 
 ---
 
+![NovaTask Demo](demo.gif)
+
 </div>
 
 ## ✨ Features
