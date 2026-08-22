@@ -62,6 +62,8 @@ pub struct App {
     selected_process_pid: Option<Pid>,
     is_prompting_workspace: bool,
     workspace_prompt_text: String,
+    is_command_palette: bool,
+    command_prompt_text: String,
     notification: Option<String>,
     notification_expiry: Option<std::time::Instant>,
 }
@@ -115,6 +117,8 @@ impl App {
             selected_process_pid: None,
             is_prompting_workspace: false,
             workspace_prompt_text: String::new(),
+            is_command_palette: false,
+            command_prompt_text: String::new(),
             notification: None,
             notification_expiry: None,
         }
@@ -154,6 +158,19 @@ impl App {
                 let main_area = chunks[0];
                 let footer_area = chunks[1];
                 
+                // Command Palette check
+                if self.is_command_palette {
+                    let block = ratatui::widgets::Block::default()
+                        .title(" Command Palette (kill <name>, restart <name>, logs <name>) - Enter to run, Esc to cancel ")
+                        .borders(ratatui::widgets::Borders::ALL)
+                        .style(ratatui::style::Style::default().bg(ratatui::style::Color::DarkGray).fg(ratatui::style::Color::White));
+                    let p = ratatui::widgets::Paragraph::new(self.command_prompt_text.as_str()).block(block);
+                    let area = ratatui::layout::Rect::new(size.width / 4, size.height / 2 - 2, size.width / 2, 3);
+                    f.render_widget(ratatui::widgets::Clear, area);
+                    f.render_widget(p, area);
+                    return;
+                }
+
                 // Prompt overlay check
                 if self.is_prompting_workspace {
                     let block = ratatui::widgets::Block::default()
@@ -169,7 +186,8 @@ impl App {
 
                 match self.active_screen {
                     ActiveScreen::ProcessList => {
-                        render_process_list(f, main_area, &self.processes, &mut self.process_list_state);
+                        let metrics = self.process_manager.get_system_metrics();
+                        render_process_list(f, main_area, &self.processes, &metrics, &mut self.process_list_state);
                     }
                     ActiveScreen::ProcessDetails => {
                         let selected_process = self.selected_process_pid.and_then(|pid| self.processes.iter().find(|p| p.pid == pid));
@@ -194,7 +212,7 @@ impl App {
                 }
 
                 // Render Footer
-                let footer_text = " NovaTask | [V] Cycle Views | [/] Search | [W] Add to Workspace | [Q] Quit ";
+                let footer_text = " NovaTask | [V] Cycle Views | [/] Search | [W] Add Workspace | [:] Command | [Q] Quit ";
                 let footer = ratatui::widgets::Paragraph::new(footer_text)
                     .style(ratatui::style::Style::default().fg(ratatui::style::Color::White).bg(ratatui::style::Color::Blue));
                 f.render_widget(footer, footer_area);
@@ -285,15 +303,78 @@ impl App {
     
     fn sort_processes(&mut self) {
         let state = &self.process_list_state;
-        self.processes.sort_by(|a, b| {
-            let cmp = match state.sort_by {
-                SortColumn::Pid => a.pid.as_u32().cmp(&b.pid.as_u32()),
-                SortColumn::Name => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-                SortColumn::Cpu => a.cpu_usage.partial_cmp(&b.cpu_usage).unwrap_or(std::cmp::Ordering::Equal),
-                SortColumn::Memory => a.memory.cmp(&b.memory),
-            };
-            if state.sort_descending { cmp.reverse() } else { cmp }
-        });
+        
+        // Reset depth
+        for p in &mut self.processes {
+            p.tree_depth = 0;
+        }
+
+        if state.is_tree_view {
+            // Build parent-child map
+            let mut children_map: std::collections::HashMap<Option<sysinfo::Pid>, Vec<ProcessInfo>> = std::collections::HashMap::new();
+            for p in self.processes.drain(..) {
+                children_map.entry(p.parent).or_default().push(p);
+            }
+            
+            // Reconstruct flattened
+            let mut flattened = Vec::new();
+            
+            // Helper function to recursively add children
+            fn add_children(
+                pid: Option<sysinfo::Pid>, 
+                depth: u16, 
+                map: &mut std::collections::HashMap<Option<sysinfo::Pid>, Vec<ProcessInfo>>,
+                flat: &mut Vec<ProcessInfo>,
+                sort_col: &SortColumn,
+                desc: bool
+            ) {
+                if let Some(mut children) = map.remove(&pid) {
+                    children.sort_by(|a, b| {
+                        let cmp = match sort_col {
+                            SortColumn::Pid => a.pid.as_u32().cmp(&b.pid.as_u32()),
+                            SortColumn::Name => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                            SortColumn::Cpu => a.cpu_usage.partial_cmp(&b.cpu_usage).unwrap_or(std::cmp::Ordering::Equal),
+                            SortColumn::Memory => a.memory.cmp(&b.memory),
+                        };
+                        if desc { cmp.reverse() } else { cmp }
+                    });
+                    for mut child in children {
+                        child.tree_depth = depth;
+                        let child_pid = child.pid;
+                        flat.push(child);
+                        add_children(Some(child_pid), depth + 1, map, flat, sort_col, desc);
+                    }
+                }
+            }
+            
+            // Start with orphans (no parent or parent not in map)
+            // Wait, we need to find root processes (parent is None, or parent is not in the full list)
+            // A simple way: find all keys in map that don't exist in any values
+            let all_pids: std::collections::HashSet<_> = children_map.values().flat_map(|v| v.iter().map(|p| p.pid)).collect();
+            let mut roots = Vec::new();
+            let keys: Vec<_> = children_map.keys().copied().collect();
+            for k in keys {
+                if k.is_none() || !all_pids.contains(&k.unwrap()) {
+                    roots.push(k);
+                }
+            }
+            
+            for root in roots {
+                add_children(root, 0, &mut children_map, &mut flattened, &state.sort_by, state.sort_descending);
+            }
+            
+            self.processes = flattened;
+        } else {
+            self.processes.sort_by(|a, b| {
+                let cmp = match state.sort_by {
+                    SortColumn::Pid => a.pid.as_u32().cmp(&b.pid.as_u32()),
+                    SortColumn::Name => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                    SortColumn::Cpu => a.cpu_usage.partial_cmp(&b.cpu_usage).unwrap_or(std::cmp::Ordering::Equal),
+                    SortColumn::Memory => a.memory.cmp(&b.memory),
+                };
+                if state.sort_descending { cmp.reverse() } else { cmp }
+            });
+        }
     }
 
     async fn handle_workspace_action(&mut self, action: char) {
@@ -351,7 +432,74 @@ impl App {
 
         if has_event {
             let event = event::read()?;
+            
+            if let Event::Mouse(mouse) = event {
+                use crossterm::event::MouseEventKind;
+                match mouse.kind {
+                    MouseEventKind::ScrollDown => {
+                        match self.active_screen {
+                            ActiveScreen::ProcessList => self.process_list_state.next(self.processes.len()),
+                            ActiveScreen::ServiceList => self.service_list_state.next(self.services.len()),
+                            ActiveScreen::DockerList => self.docker_list_state.next(self.containers.len()),
+                            ActiveScreen::WorkspaceList => {
+                                if self.workspace_list_state.focus_items {
+                                    if let Some(i) = self.workspace_list_state.table_state.selected() {
+                                        if let Some(ws) = self.workspaces.get(i) { self.workspace_list_state.item_next(ws.items.len()); }
+                                    }
+                                } else { self.workspace_list_state.next(self.workspaces.len()); }
+                            },
+                            ActiveScreen::PortList => self.port_list_state.next(self.ports.len()),
+                            ActiveScreen::LogView => { let max = self.log_view_state.logs.len() as u16; self.log_view_state.scroll_down(max); },
+                            _ => {}
+                        }
+                    }
+                    MouseEventKind::ScrollUp => {
+                        match self.active_screen {
+                            ActiveScreen::ProcessList => self.process_list_state.previous(self.processes.len()),
+                            ActiveScreen::ServiceList => self.service_list_state.previous(self.services.len()),
+                            ActiveScreen::DockerList => self.docker_list_state.previous(self.containers.len()),
+                            ActiveScreen::WorkspaceList => {
+                                if self.workspace_list_state.focus_items {
+                                    if let Some(i) = self.workspace_list_state.table_state.selected() {
+                                        if let Some(ws) = self.workspaces.get(i) { self.workspace_list_state.item_previous(ws.items.len()); }
+                                    }
+                                } else { self.workspace_list_state.previous(self.workspaces.len()); }
+                            },
+                            ActiveScreen::PortList => self.port_list_state.previous(self.ports.len()),
+                            ActiveScreen::LogView => self.log_view_state.scroll_up(),
+                            _ => {}
+                        }
+                    }
+                    _ => {}
+                }
+                return Ok(());
+            }
+
             if let Event::Key(key) = event {
+                // Command palette overlay
+                if self.is_command_palette {
+                    match key.code {
+                        KeyCode::Esc => {
+                            self.is_command_palette = false;
+                            self.command_prompt_text.clear();
+                        }
+                        KeyCode::Enter => {
+                            let text = self.command_prompt_text.clone();
+                            self.is_command_palette = false;
+                            self.command_prompt_text.clear();
+                            self.execute_palette_command(&text).await;
+                        }
+                        KeyCode::Backspace => {
+                            self.command_prompt_text.pop();
+                        }
+                        KeyCode::Char(c) => {
+                            self.command_prompt_text.push(c);
+                        }
+                        _ => {}
+                    }
+                    return Ok(());
+                }
+
                 // Workspace naming prompt overlay
                 if self.is_prompting_workspace {
                     match key.code {
@@ -393,6 +541,11 @@ impl App {
                         };
                         return Ok(());
                     }
+                    if key.code == KeyCode::Char(':') {
+                        self.is_command_palette = true;
+                        self.command_prompt_text.clear();
+                        return Ok(());
+                    }
                 }
 
                 match self.active_screen {
@@ -418,7 +571,12 @@ impl App {
                                         }
                                     }
                                 }
-                                KeyCode::Char('T') | KeyCode::Char('t') => self.active_screen = ActiveScreen::PortList,
+                                KeyCode::Char('T') | KeyCode::Char('t') => {
+                                    self.process_list_state.is_tree_view = !self.process_list_state.is_tree_view;
+                                    self.refresh_process_list();
+                                    self.notify(if self.process_list_state.is_tree_view { "Tree view enabled" } else { "Tree view disabled" });
+                                }
+                                KeyCode::Char('O') | KeyCode::Char('o') => self.active_screen = ActiveScreen::PortList,
                                 KeyCode::Char('W') | KeyCode::Char('w') => {
                                     if let Some(i) = self.process_list_state.table_state.selected() {
                                         if let Some(p) = self.processes.get(i).cloned() {
@@ -707,5 +865,63 @@ impl App {
             }
         }
         Ok(())
+    }
+
+    async fn execute_palette_command(&mut self, command: &str) {
+        let parts: Vec<&str> = command.split_whitespace().collect();
+        if parts.is_empty() { return; }
+
+        let cmd = parts[0].to_lowercase();
+        let target = if parts.len() > 1 { parts[1..].join(" ").to_lowercase() } else { String::new() };
+
+        match cmd.as_str() {
+            "kill" => {
+                if let Some(p) = self.processes.iter().find(|p| p.name.to_lowercase().contains(&target)) {
+                    let _ = self.process_manager.kill_process(p.pid);
+                    self.notify(format!("Killed process {} ({})", p.name, p.pid));
+                } else {
+                    self.notify(format!("Process '{}' not found", target));
+                }
+            }
+            "restart" => {
+                // Check docker first, then services
+                if let Some(c) = self.containers.iter().find(|c| c.name.to_lowercase().contains(&target)) {
+                    let _ = self.docker_manager.restart_container(&c.name).await;
+                    self.notify(format!("Restarted container {}", c.name));
+                } else if let Some(s) = self.services.iter().find(|s| s.name.to_lowercase().contains(&target)) {
+                    let _ = self.service_manager.restart_service(&s.name);
+                    self.notify(format!("Restarted service {}", s.name));
+                } else {
+                    self.notify(format!("Target '{}' not found in containers or services", target));
+                }
+            }
+            "logs" => {
+                if let Some(c) = self.containers.iter().find(|c| c.name.to_lowercase().contains(&target)) {
+                    self.log_view_state = LogViewState::new();
+                    self.log_view_state.container_id = Some(c.id.clone());
+                    self.log_view_state.title = c.name.clone();
+                    if let Ok(logs) = self.docker_manager.get_container_logs(&c.id, 100).await {
+                        self.log_view_state.set_logs(logs);
+                    }
+                    self.previous_screen = self.active_screen;
+                    self.active_screen = ActiveScreen::LogView;
+                } else if let Some(s) = self.services.iter().find(|s| s.name.to_lowercase().contains(&target)) {
+                    self.log_view_state = LogViewState::new();
+                    self.log_view_state.service_name = Some(s.name.clone());
+                    self.log_view_state.title = s.name.clone();
+                    if let Ok(logs) = self.service_manager.get_service_logs(&s.name, 100) {
+                        self.log_view_state.set_logs(logs);
+                    }
+                    self.previous_screen = self.active_screen;
+                    self.active_screen = ActiveScreen::LogView;
+                } else {
+                    self.notify(format!("Logs for '{}' not found", target));
+                }
+            }
+            "quit" | "q" => self.should_quit = true,
+            _ => {
+                self.notify(format!("Unknown command: {}", cmd));
+            }
+        }
     }
 }

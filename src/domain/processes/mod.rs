@@ -1,4 +1,5 @@
 pub mod models;
+pub mod system_metrics;
 
 use models::ProcessInfo;
 use sysinfo::{Pid, System, Users};
@@ -78,9 +79,20 @@ impl ProcessManager {
                     user_id,
                     cpu_history: cpu_hist,
                     memory_history: mem_hist,
+                    tree_depth: 0,
                 }
             })
             .collect()
+    }
+
+    pub fn get_system_metrics(&self) -> system_metrics::SystemMetrics {
+        system_metrics::SystemMetrics {
+            cpu_usage: self.system.global_cpu_usage(),
+            used_memory: self.system.used_memory(),
+            total_memory: self.system.total_memory(),
+            used_swap: self.system.used_swap(),
+            total_swap: self.system.total_swap(),
+        }
     }
 
     pub fn kill_process(&self, pid: Pid) -> Result<()> {

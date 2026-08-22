@@ -16,4 +16,5 @@ pub struct ProcessInfo {
     pub user_id: Option<String>,
     pub cpu_history: Vec<u64>,
     pub memory_history: Vec<u64>,
+    pub tree_depth: u16,
 }
