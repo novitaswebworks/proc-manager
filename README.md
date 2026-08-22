@@ -105,3 +105,11 @@ Contributions, issues, and feature requests are welcome! Feel free to check the 
 <div align="center">
   <i>Built with ❤️ by Novitas Webworks</i>
 </div>
+
+## 🗺️ Roadmap / Future Implementations
+We have big plans to make NovaTask even more powerful. Here is what we are planning to build next:
+- **📈 Resource History Graphs**: (Currently In Progress) Rolling CPU/Memory sparklines for deeper performance insights.
+- **🌍 Remote Server Support (SSH)**: Add your staging/production servers to your `config.toml` to monitor remote processes and Docker containers seamlessly.
+- **🐳 Detailed Docker Inspect**: View port mappings, environment variables, and live resource usage for specific containers.
+- **🖍️ Smart Log Highlighting**: Automatically parse and highlight `ERROR`, `WARN`, and pretty-print JSON objects in live log streams.
+- **✔️ Multi-Select Batch Actions**: Select multiple processes or containers with `Spacebar` and kill them all at once.
