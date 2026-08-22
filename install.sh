@@ -55,6 +55,7 @@ tar -xzf "$BINARY_NAME.tar.gz"
 echo "Installing to $INSTALL_DIR (requires sudo)..."
 sudo mv "$BINARY_NAME" "$INSTALL_DIR/"
 sudo chmod +x "$INSTALL_DIR/$BINARY_NAME"
+sudo ln -sf "$INSTALL_DIR/$BINARY_NAME" "$INSTALL_DIR/nova"
 
 # Clean up
 cd - > /dev/null
@@ -62,6 +63,6 @@ rm -rf "$TMP_DIR"
 
 echo ""
 echo "==============================================="
-echo " 🎉 Successfully installed $BINARY_NAME! "
-echo " You can now run it by typing: $BINARY_NAME "
+echo " 🎉 Successfully installed NovaTask! "
+echo " You can now run it by typing: nova "
 echo "==============================================="
