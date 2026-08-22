@@ -125,7 +125,7 @@ pub fn render_docker_list(
         Constraint::Min(20),    // Ports
     ])
     .header(header)
-    .block(Block::default().borders(Borders::ALL).title(" Docker Containers (S: Start, K: Stop, R: Restart, W: Add to Workspace, L: Logs) "))
+    .block(Block::default().borders(Borders::ALL).title(" Docker Containers (S: Start, K: Stop, R: Restart, W: Add to Workspace, L: Logs, E: Shell) "))
     .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED))
     .highlight_symbol(">> ");
 

@@ -160,7 +160,7 @@ pub fn render_process_list(f: &mut Frame, area: Rect, processes: &[ProcessInfo],
         Constraint::Length(15),
     ])
     .header(header)
-    .block(Block::default().borders(Borders::ALL).title(" Processes (T: Toggle Tree, O: Network, W: Add to Workspace) "))
+    .block(Block::default().borders(Borders::ALL).title(" Processes (T: Tree, O: Net, Sort: c/m/p/n/r) "))
     .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED))
     .highlight_symbol(">> ");
 
