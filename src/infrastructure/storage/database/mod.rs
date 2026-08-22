@@ -11,7 +11,7 @@ pub struct Database {
 
 impl Database {
     pub async fn init(config: &Config) -> Result<Self> {
-        let db_url = format!("sqlite:{}?mode=rwc", config.database_path.to_string_lossy());
+        let db_url = format!("sqlite:{}?mode=rwc", config.get_database_path().to_string_lossy());
 
         tracing::info!("Initializing database at {}", db_url);
 

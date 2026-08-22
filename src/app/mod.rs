@@ -88,8 +88,24 @@ impl App {
 
         let mut workspace_manager = WorkspaceManager::new(database.clone());
         let _ = workspace_manager.refresh().await;
+        if let Some(ws_conf) = &config.workspaces {
+            workspace_manager.load_config_workspaces(ws_conf);
+        }
         let workspaces = workspace_manager.get_workspaces();
         
+        let mut active_screen = ActiveScreen::ProcessList;
+        if let Some(theme) = &config.theme {
+            if let Some(view) = &theme.default_view {
+                match view.as_str() {
+                    "DockerList" => active_screen = ActiveScreen::DockerList,
+                    "ServiceList" => active_screen = ActiveScreen::ServiceList,
+                    "WorkspaceList" => active_screen = ActiveScreen::WorkspaceList,
+                    "PortList" => active_screen = ActiveScreen::PortList,
+                    _ => {}
+                }
+            }
+        }
+
         Self {
             config,
             database,
@@ -112,8 +128,8 @@ impl App {
             workspaces,
             workspace_list_state: WorkspaceListState::new(),
             log_view_state: LogViewState::new(),
-            active_screen: ActiveScreen::ProcessList,
-            previous_screen: ActiveScreen::ProcessList,
+            active_screen,
+            previous_screen: active_screen,
             selected_process_pid: None,
             is_prompting_workspace: false,
             workspace_prompt_text: String::new(),
