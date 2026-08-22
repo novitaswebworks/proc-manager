@@ -19,12 +19,13 @@
 ## ✨ Features
 
 - **📊 Real-time Dashboard**: Instantly view global CPU, Memory, and Swap usage with color-coded gauges.
+- **📈 Historical Line Charts**: Dive into detailed process views to see rolling historical resource graphs.
 - **🌲 Process Tree View**: Toggle a hierarchical tree view (`T`) to see which processes spawned others and manage them cleanly.
-- **🐳 Docker Integration**: Start, stop, restart, and stream logs for Docker containers without leaving the app.
+- **🐳 Docker Superpowers**: Start, stop, restart, stream logs, and even `exec` into Docker containers seamlessly without leaving the app.
 - **⚙️ Service Manager**: Control `systemd` (Linux) and `launchd` (macOS) services with ease.
 - **⚡ Command Palette**: Press `:` to open a fuzzy command palette. Type `kill node` or `restart postgres` and let NovaTask handle the rest.
 - **🖱️ Mouse Support**: Full mouse support! Click tabs, scroll through lists, and navigate logs effortlessly.
-- **🌐 Network Ports**: Instantly see which process is listening on which port.
+- **🌐 Network Ports**: Advanced Listening Ports screen with IP bindings, colors, and interactive shortcuts to see which process is listening on which port.
 - **🗂️ Workspaces**: Group related processes, containers, and services into custom workspaces to manage your entire dev stack at once.
 
 ## 📁 Configuration & Custom Workspaces
@@ -108,7 +109,6 @@ Contributions, issues, and feature requests are welcome! Feel free to check the 
 
 ## 🗺️ Roadmap / Future Implementations
 We have big plans to make NovaTask even more powerful. Here is what we are planning to build next:
-- **📈 Resource History Graphs**: (Currently In Progress) Rolling CPU/Memory sparklines for deeper performance insights.
 - **🌍 Remote Server Support (SSH)**: Add your staging/production servers to your `config.toml` to monitor remote processes and Docker containers seamlessly.
 - **🐳 Detailed Docker Inspect**: View port mappings, environment variables, and live resource usage for specific containers.
 - **🖍️ Smart Log Highlighting**: Automatically parse and highlight `ERROR`, `WARN`, and pretty-print JSON objects in live log streams.
