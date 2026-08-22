@@ -51,18 +51,38 @@ pub fn render_process_details(f: &mut Frame, area: Rect, process: Option<&Proces
         let paragraph = Paragraph::new(text).block(block);
         f.render_widget(paragraph, chunks[0]);
 
-        let cpu_sparkline = Sparkline::default()
-            .block(Block::default().title(" CPU Usage History ").borders(Borders::ALL))
-            .data(&p.cpu_history)
-            .style(Style::default().fg(Color::Yellow));
-            
-        let mem_sparkline = Sparkline::default()
-            .block(Block::default().title(" Memory Usage History (MB) ").borders(Borders::ALL))
-            .data(&p.memory_history)
-            .style(Style::default().fg(Color::Cyan));
+        let cpu_data: Vec<(f64, f64)> = p.cpu_history.iter().enumerate().map(|(i, &v)| (i as f64, v as f64 / 100.0)).collect();
+        let mem_data: Vec<(f64, f64)> = p.memory_history.iter().enumerate().map(|(i, &v)| (i as f64, v as f64)).collect();
 
-        f.render_widget(cpu_sparkline, chunks[1]);
-        f.render_widget(mem_sparkline, chunks[2]);
+        let cpu_max = cpu_data.iter().map(|(_, v)| *v).fold(10.0f64, f64::max); 
+        let mem_max = mem_data.iter().map(|(_, v)| *v).fold(100.0f64, f64::max);
+
+        let cpu_dataset = ratatui::widgets::Dataset::default()
+            .name("CPU %")
+            .marker(ratatui::symbols::Marker::Braille)
+            .graph_type(ratatui::widgets::GraphType::Line)
+            .style(Style::default().fg(Color::Yellow))
+            .data(&cpu_data);
+
+        let cpu_chart = ratatui::widgets::Chart::new(vec![cpu_dataset])
+            .block(Block::default().title(" CPU Usage History ").borders(Borders::ALL))
+            .x_axis(ratatui::widgets::Axis::default().bounds([0.0, 60.0]))
+            .y_axis(ratatui::widgets::Axis::default().bounds([0.0, cpu_max]).labels(vec![Span::raw("0%"), Span::raw(format!("{:.0}%", cpu_max))]));
+
+        let mem_dataset = ratatui::widgets::Dataset::default()
+            .name("Memory MB")
+            .marker(ratatui::symbols::Marker::Braille)
+            .graph_type(ratatui::widgets::GraphType::Line)
+            .style(Style::default().fg(Color::Cyan))
+            .data(&mem_data);
+
+        let mem_chart = ratatui::widgets::Chart::new(vec![mem_dataset])
+            .block(Block::default().title(" Memory Usage History ").borders(Borders::ALL))
+            .x_axis(ratatui::widgets::Axis::default().bounds([0.0, 60.0]))
+            .y_axis(ratatui::widgets::Axis::default().bounds([0.0, mem_max]).labels(vec![Span::raw("0"), Span::raw(format!("{:.0}", mem_max))]));
+
+        f.render_widget(cpu_chart, chunks[1]);
+        f.render_widget(mem_chart, chunks[2]);
     } else {
         let block = Block::default()
             .title(" Process Details (Press ESC to go back) ")
