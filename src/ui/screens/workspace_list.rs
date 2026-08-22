@@ -33,7 +33,7 @@ impl WorkspaceListState {
         }
         let i = match self.table_state.selected() {
             Some(i) => {
-                if i >= item_count - 1 { 0 } else { i + 1 }
+                if i >= item_count.saturating_sub(1) { 0 } else { i + 1 }
             }
             None => 0,
         };
@@ -64,7 +64,7 @@ impl WorkspaceListState {
         }
         let i = match self.item_list_state.selected() {
             Some(i) => {
-                if i >= item_count - 1 { 0 } else { i + 1 }
+                if i >= item_count.saturating_sub(1) { item_count.saturating_sub(1) } else { i + 1 }
             }
             None => 0,
         };
@@ -78,7 +78,7 @@ impl WorkspaceListState {
         }
         let i = match self.item_list_state.selected() {
             Some(i) => {
-                if i == 0 { item_count - 1 } else { i - 1 }
+                if i == 0 { 0 } else { i - 1 }
             }
             None => 0,
         };

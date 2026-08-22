@@ -28,8 +28,8 @@ impl DockerListState {
         }
         let i = match self.table_state.selected() {
             Some(i) => {
-                if i >= item_count - 1 {
-                    0
+                if i >= item_count.saturating_sub(1) {
+                    item_count.saturating_sub(1)
                 } else {
                     i + 1
                 }
@@ -47,7 +47,7 @@ impl DockerListState {
         let i = match self.table_state.selected() {
             Some(i) => {
                 if i == 0 {
-                    item_count - 1
+                    0
                 } else {
                     i - 1
                 }
