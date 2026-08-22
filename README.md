@@ -27,6 +27,33 @@
 - **🌐 Network Ports**: Instantly see which process is listening on which port.
 - **🗂️ Workspaces**: Group related processes, containers, and services into custom workspaces to manage your entire dev stack at once.
 
+## 📁 Configuration & Custom Workspaces
+
+NovaTask allows you to define a persistent `config.toml` file to customize your default view and set up "Project Workspaces".
+
+**Config Location:**
+- **macOS:** `~/Library/Application Support/com.novitas.nman/config.toml`
+- **Linux:** `~/.config/nman/config.toml`
+
+**Example Configuration:**
+```toml
+[theme]
+default_view = "WorkspaceList" # Options: ProcessList, DockerList, ServiceList, WorkspaceList
+
+# Group your backend stack into a single manageable unit
+[workspaces.backend]
+containers = ["postgres", "redis"]
+processes = ["node", "python3"]
+services = ["nginx"]
+```
+
+### Workspace "God Mode"
+When navigating the **Workspaces** tab (`V`), you can manage your entire stack at once:
+- Press **`Tab`** to switch focus between your Workspace list and the items inside it.
+- Select a Workspace and press **`S`** to Start all containers/services in it simultaneously.
+- Press **`K`** to Stop/Kill all items in the workspace with one keystroke.
+
+
 ## 🚀 Installation
 
 ### Using Homebrew (macOS & Linux)
