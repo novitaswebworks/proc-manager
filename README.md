@@ -42,7 +42,7 @@ curl -fsSL https://raw.githubusercontent.com/novitaswebworks/proc-manager/main/i
 
 Once installed, simply type the short command to launch the dashboard:
 ```bash
-nova
+nman
 ```
 *(Note: You can also use `proc-manager` if you prefer!)*
 
