@@ -5,3 +5,4 @@ pub mod service_list;
 pub mod docker_list;
 pub mod workspace_list;
 pub mod log_view;
+pub mod server_list;

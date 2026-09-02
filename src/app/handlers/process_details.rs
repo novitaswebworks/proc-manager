@@ -7,7 +7,7 @@ impl App {
             KeyCode::Esc | KeyCode::Char('q') => self.active_screen = ActiveScreen::ProcessList,
             KeyCode::Char('K') => {
                 if let Some(pid) = self.selected_process_pid {
-                    let _ = self.process_manager.kill_process(pid);
+                    let _ = self.process_manager.kill_process(pid, Some(&self.ssh_manager));
                     self.notify(format!("Sent Kill to process {}", pid));
                     self.active_screen = ActiveScreen::ProcessList;
                     self.refresh_process_list();

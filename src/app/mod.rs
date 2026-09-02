@@ -18,6 +18,7 @@ use crate::ui::screens::service_list::{ServiceListState, render_service_list};
 use crate::ui::screens::docker_list::{DockerListState, render_docker_list};
 use crate::ui::screens::workspace_list::{WorkspaceListState, render_workspace_list};
 use crate::ui::screens::log_view::{LogViewState, render_log_view};
+use crate::ui::screens::server_list::{ServerListState, ServerInfo, render_server_list};
 use crate::ui::{init_tui, restore_tui, Tui};
 use crate::errors::Result;
 use crossterm::event::{self, Event, KeyCode};
@@ -34,6 +35,7 @@ pub enum ActiveScreen {
     DockerList,
     WorkspaceList,
     LogView,
+    ServerList,
 }
 
 pub struct App {
@@ -57,6 +59,9 @@ pub struct App {
     workspace_manager: WorkspaceManager,
     workspaces: Vec<WorkspaceInfo>,
     workspace_list_state: WorkspaceListState,
+    servers: Vec<ServerInfo>,
+    server_list_state: ServerListState,
+    ssh_manager: crate::infrastructure::ssh_manager::SshManager,
     log_view_state: LogViewState,
     active_screen: ActiveScreen,
     previous_screen: ActiveScreen,
@@ -72,7 +77,7 @@ pub struct App {
 impl App {
     pub async fn new(config: Config, database: Database, platform: PlatformManager, event_bus: EventBus) -> Self {
         let mut process_manager = ProcessManager::new();
-        process_manager.refresh();
+        process_manager.refresh(None);
         let processes = process_manager.get_processes();
         
         let mut port_manager = PortManager::new();
@@ -107,6 +112,17 @@ impl App {
             }
         }
 
+        let mut initial_servers = Vec::new();
+        if let Some(srv_conf) = &config.servers {
+            for sc in srv_conf {
+                initial_servers.push(ServerInfo {
+                    name: sc.name.clone(),
+                    address: sc.address.clone(),
+                    status: "Disconnected".to_string(),
+                });
+            }
+        }
+
         Self {
             config,
             database,
@@ -128,6 +144,9 @@ impl App {
             workspace_manager,
             workspaces,
             workspace_list_state: WorkspaceListState::new(),
+            servers: initial_servers,
+            server_list_state: ServerListState::new(),
+            ssh_manager: crate::infrastructure::ssh_manager::SshManager::new(),
             log_view_state: LogViewState::new(),
             active_screen,
             previous_screen: active_screen,
@@ -226,6 +245,9 @@ impl App {
                     ActiveScreen::LogView => {
                         render_log_view(f, main_area, &mut self.log_view_state);
                     }
+                    ActiveScreen::ServerList => {
+                        render_server_list(f, main_area, &self.servers, &mut self.server_list_state);
+                    }
                 }
 
                 // Render Footer
@@ -257,7 +279,7 @@ impl App {
 
             tokio::select! {
                 _ = interval.tick() => {
-                    self.process_manager.refresh();
+                    self.process_manager.refresh(Some(&self.ssh_manager));
                     self.refresh_process_list();
                     self.port_manager.refresh();
                     self.refresh_port_list();
@@ -412,7 +434,7 @@ impl App {
                                         }
                                     }
                                     for pid in pids_to_kill {
-                                        let _ = self.process_manager.kill_process(pid);
+                                        let _ = self.process_manager.kill_process(pid, Some(&self.ssh_manager));
                                     }
                                 }
                             }
@@ -467,6 +489,7 @@ impl App {
                             },
                             ActiveScreen::PortList => self.port_list_state.next(self.ports.len()),
                             ActiveScreen::LogView => { let max = self.log_view_state.logs.len() as u16; self.log_view_state.scroll_down(max); },
+                            ActiveScreen::ServerList => self.server_list_state.next(self.servers.len()),
                             _ => {}
                         }
                     }
@@ -484,6 +507,7 @@ impl App {
                             },
                             ActiveScreen::PortList => self.port_list_state.previous(self.ports.len()),
                             ActiveScreen::LogView => self.log_view_state.scroll_up(),
+                            ActiveScreen::ServerList => self.server_list_state.previous(self.servers.len()),
                             _ => {}
                         }
                     }
@@ -553,7 +577,8 @@ impl App {
                             ActiveScreen::ServiceList => ActiveScreen::DockerList,
                             ActiveScreen::DockerList => ActiveScreen::WorkspaceList,
                             ActiveScreen::WorkspaceList => ActiveScreen::PortList,
-                            ActiveScreen::PortList => ActiveScreen::ProcessList,
+                            ActiveScreen::PortList => ActiveScreen::ServerList,
+                            ActiveScreen::ServerList => ActiveScreen::ProcessList,
                             ActiveScreen::LogView => self.previous_screen,
                         };
                         return Ok(());
@@ -573,6 +598,7 @@ impl App {
                     ActiveScreen::DockerList => self.handle_docker_list_events(key).await,
                     ActiveScreen::WorkspaceList => self.handle_workspace_list_events(key).await,
                     ActiveScreen::LogView => self.handle_log_view_events(key).await,
+                    ActiveScreen::ServerList => self.handle_server_list_events(key),
                 }
             }
         }
@@ -589,7 +615,7 @@ impl App {
         match cmd.as_str() {
             "kill" => {
                 if let Some(p) = self.processes.iter().find(|p| p.name.to_lowercase().contains(&target)) {
-                    let _ = self.process_manager.kill_process(p.pid);
+                    let _ = self.process_manager.kill_process(p.pid, Some(&self.ssh_manager));
                     self.notify(format!("Killed process {} ({})", p.name, p.pid));
                 } else {
                     self.notify(format!("Process '{}' not found", target));

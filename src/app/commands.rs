@@ -20,7 +20,7 @@ impl App {
                                         }
                                     }
                                     for pid in pids_to_kill {
-                                        let _ = self.process_manager.kill_process(pid);
+                                        let _ = self.process_manager.kill_process(pid, Some(&self.ssh_manager));
                                     }
                                 }
                             }
@@ -60,7 +60,7 @@ impl App {
         match cmd.as_str() {
             "kill" => {
                 if let Some(p) = self.processes.iter().find(|p| p.name.to_lowercase().contains(&target)) {
-                    let _ = self.process_manager.kill_process(p.pid);
+                    let _ = self.process_manager.kill_process(p.pid, Some(&self.ssh_manager));
                     self.notify(format!("Killed process {} ({})", p.name, p.pid));
                 } else {
                     self.notify(format!("Process '{}' not found", target));

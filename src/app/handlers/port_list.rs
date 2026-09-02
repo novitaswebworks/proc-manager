@@ -33,7 +33,7 @@ impl App {
                         if let Some(p) = self.ports.get(i).cloned() {
                             for pid in p.pids {
                                 if let Some(sys_pid) = self.processes.iter().find(|pr| pr.pid.as_u32() == pid).map(|pr| pr.pid) {
-                                    let _ = self.process_manager.kill_process(sys_pid);
+                                    let _ = self.process_manager.kill_process(sys_pid, Some(&self.ssh_manager));
                                     self.notify(format!("Killed process {} holding port {}", pid, p.local_port));
                                 }
                             }

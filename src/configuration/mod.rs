@@ -18,6 +18,15 @@ pub struct Config {
     pub log_path: Option<PathBuf>,
     pub theme: Option<ThemeConfig>,
     pub workspaces: Option<HashMap<String, WorkspaceConfig>>,
+    pub servers: Option<Vec<ServerConfig>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerConfig {
+    pub name: String,
+    pub address: String,
+    pub user: String,
+    pub ssh_key: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
